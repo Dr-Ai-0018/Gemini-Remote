@@ -64,8 +64,12 @@ if (manifest.key || manifest.content_security_policy) {
 }
 const pyInit = await readFile(new URL('src/gemini_remote/__init__.py', root), 'utf8');
 const pyVersion = /__version__ = "([^"]+)"/.exec(pyInit)?.[1];
-if (pyVersion !== manifest.version) {
-  throw new Error(`version mismatch: manifest ${manifest.version}, Python package ${pyVersion}`);
+const pyproject = await readFile(new URL('pyproject.toml', root), 'utf8');
+const projectVersion = /^version = "([^"]+)"/m.exec(pyproject)?.[1];
+if (pyVersion !== manifest.version || projectVersion !== manifest.version) {
+  throw new Error(
+    `version mismatch: manifest ${manifest.version}, __init__ ${pyVersion}, pyproject ${projectVersion}`,
+  );
 }
 
 manifest.key = key;

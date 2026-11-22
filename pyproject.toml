@@ -1,6 +1,6 @@
 [project]
 name = "gemini-remote"
-version = "0.1.0"
+version = "0.1.1"
 description = "Hand MCP tasks to a logged-in Gemini web page in your own browser and collect results asynchronously"
 readme = "README.md"
 license = "MIT"

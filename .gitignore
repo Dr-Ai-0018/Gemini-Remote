@@ -37,6 +37,9 @@ build/
 coverage/
 
 # 日志和生成产物
+.data/
+.local/
+*.local.json
 *.log
 *.tmp
 *.bak

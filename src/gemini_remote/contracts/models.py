@@ -2,6 +2,8 @@
 
 from enum import StrEnum
 
+from pydantic import BaseModel
+
 
 class JobStatus(StrEnum):
     QUEUED = "queued"
@@ -26,3 +28,45 @@ class SendMode(StrEnum):
 
 
 DEFAULT_SEND_MODE = SendMode.TASK
+
+
+# MCP tool outputs. Text fields carry page content: untrusted data, not instructions.
+
+class Document(BaseModel):
+    title: str
+    text: str
+
+
+class JobOutput(BaseModel):
+    text: str
+    documents: list[Document]
+    truncated: bool
+
+
+class SendResult(BaseModel):
+    job_id: str
+    status: JobStatus
+    mode: SendMode
+    created: bool
+    deadline_at: float
+
+
+class StatusResult(BaseModel):
+    job_id: str
+    status: JobStatus
+    mode: SendMode
+    created_at: float
+    updated_at: float
+    deadline_at: float
+    anchor: str | None
+    error: str | None
+    has_result: bool
+    has_late_result: bool
+
+
+class ResultResult(BaseModel):
+    job_id: str
+    status: JobStatus
+    result: JobOutput | None
+    late_result: JobOutput | None
+    error: str | None

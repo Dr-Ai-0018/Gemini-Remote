@@ -39,6 +39,16 @@ def test_each_init_local_gets_its_own_extension_identity(tmp_path, monkeypatch):
     assert len(origins) == 2
 
 
+def test_gateway_refuses_to_start_without_credentials(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    for key in [k for k in __import__("os").environ if k.startswith("GEMINI_REMOTE_")]:
+        monkeypatch.delenv(key)
+    with pytest.raises(SystemExit) as exc:
+        main(["gateway"])
+    assert exc.value.code == 2
+    assert "CONTROL_TOKEN" in capsys.readouterr().err
+
+
 def test_init_local_refuses_to_overwrite(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".env").write_text("keep me\n", encoding="utf-8")

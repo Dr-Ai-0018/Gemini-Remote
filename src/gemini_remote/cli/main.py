@@ -34,6 +34,7 @@ def init_local(path: Path) -> None:
     lines += [
         f"{PREFIX}DEVICE_ID={defaults.device_id}",
         f"{PREFIX}GATEWAY_URL=ws://127.0.0.1:{DEFAULT_GATEWAY_PORT}/ws/device",
+        f"{PREFIX}GATEWAY_PORT={DEFAULT_GATEWAY_PORT}",
         f"{PREFIX}RELAY_PORT={DEFAULT_RELAY_PORT}",
         f"{PREFIX}DATA_DIR={defaults.data_dir.as_posix()}",
         f"{PREFIX}DEFAULT_MODE={defaults.default_mode}",
@@ -53,6 +54,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("init-local", help="Create an ignored local .env with credentials and settings (no overwrite, no printing)")
+    gateway = sub.add_parser("gateway", help="Run the Gateway (MCP at /mcp/, Relay socket at /ws/device)")
+    gateway.add_argument("--host", default="127.0.0.1", help="bind address (default: loopback only)")
+    gateway.add_argument("--port", type=int, help="bind port (default: GEMINI_REMOTE_GATEWAY_PORT)")
     args = parser.parse_args(argv)
 
     if args.command == "init-local":
@@ -61,3 +65,14 @@ def main(argv: list[str] | None = None) -> None:
             parser.error(".env already exists; refusing to overwrite or rotate credentials")
         init_local(path)
         print("Created .env with local credentials and settings. Tokens were not displayed.")
+    elif args.command == "gateway":
+        import uvicorn
+
+        from gemini_remote.gateway.app import create_app
+
+        try:
+            settings = Settings.from_env("gateway")
+        except ValueError as exc:
+            parser.error(str(exc))
+        uvicorn.run(create_app(settings), host=args.host, port=args.port or settings.gateway_port,
+                    log_level="info", access_log=False)

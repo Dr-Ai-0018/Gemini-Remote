@@ -56,10 +56,12 @@ def test_invalid_local_settings_are_rejected(tmp_path, name, value):
 def test_local_preferences_override_defaults(tmp_path):
     settings = Settings.from_env(
         "relay",
-        environ=relay_env(GEMINI_REMOTE_RELAY_PORT="23456", GEMINI_REMOTE_DEFAULT_MODE="chat"),
+        environ=relay_env(GEMINI_REMOTE_RELAY_PORT="23456", GEMINI_REMOTE_GATEWAY_PORT="23457",
+                          GEMINI_REMOTE_DEFAULT_MODE="chat"),
         env_file=tmp_path / ".env",
     )
     assert settings.relay_port == 23456
+    assert settings.gateway_port == 23457
     assert settings.default_mode is SendMode.CHAT
 
 

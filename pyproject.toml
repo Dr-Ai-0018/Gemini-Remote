@@ -1,6 +1,6 @@
 [project]
 name = "gemini-remote"
-version = "0.1.1"
+version = "0.1.2"
 description = "Hand MCP tasks to a logged-in Gemini web page in your own browser and collect results asynchronously"
 readme = "README.md"
 license = "MIT"
@@ -33,3 +33,5 @@ packages = ["src/gemini_remote"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+# Starlette's TestClient nags about httpx2; the test client itself works unchanged.
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient` is deprecated"]

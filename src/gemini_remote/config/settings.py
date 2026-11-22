@@ -72,6 +72,7 @@ class Settings:
     browser_token: str = ""
     device_id: str = "local-pc"
     gateway_url: str = f"ws://127.0.0.1:{DEFAULT_GATEWAY_PORT}/ws/device"
+    gateway_port: int = DEFAULT_GATEWAY_PORT
     relay_port: int = DEFAULT_RELAY_PORT
     data_dir: Path = Path(".data")
     # Public half of the extension signing key; pins the extension ID that the
@@ -115,6 +116,7 @@ class Settings:
             **secrets,
             device_id=merged.get(PREFIX + "DEVICE_ID", defaults.device_id),
             gateway_url=merged.get(PREFIX + "GATEWAY_URL", defaults.gateway_url),
+            gateway_port=_port(merged, "GATEWAY_PORT", DEFAULT_GATEWAY_PORT),
             relay_port=_port(merged, "RELAY_PORT", DEFAULT_RELAY_PORT),
             data_dir=Path(merged.get(PREFIX + "DATA_DIR", str(defaults.data_dir))),
             extension_key=merged.get(PREFIX + "EXTENSION_KEY", ""),

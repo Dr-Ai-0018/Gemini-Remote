@@ -12,7 +12,7 @@ MCP 客户端调用 `gemini_send` 提交任务，立即拿到 job_id。任务经
 - 每个任务只发送一次；无法确认是否已发出时标记为不确定，不自动重发。
 - 页面相关的选择器集中在一个 adapter 里，Gemini 改版只改这一处。
 
-当前状态：**工程骨架阶段。** 已有 CLI、配置校验、Job 状态定义、集中的页面选择器和只读 preflight 扩展；Gateway、Relay、MCP 工具和发送链路尚未实现。
+当前状态：**开发中。** Gateway 已可在本机运行：三个 MCP 工具可用，任务存进 SQLite 排队，Relay 通过签名 WebSocket 领取任务、回报结果。Relay 和浏览器端的发送链路还没有实现，所以任务暂时只会停在排队状态。
 
 ## 使用 / Usage
 
@@ -24,7 +24,7 @@ MCP 客户端调用 `gemini_send` 提交任务，立即拿到 job_id。任务经
 
 | 路径 | 职责 |
 | --- | --- |
-| `src/gemini_remote/` | Python 包：CLI、配置、Job 合同 |
+| `src/gemini_remote/` | Python 包：CLI、配置、Job 合同与签名信封、SQLite 任务存储、Gateway |
 | `adapters/gemini/` | 与 Gemini 页面结构相关的选择器和 adapter，改版只改这里 |
 | `extensions/chromium/` | 扩展源文件与 manifest；构建产物在 ignored `dist/` |
 | `tools/` | 构建脚本 |
@@ -48,6 +48,22 @@ uv run gemini-remote init-local
 ```
 
 这条命令生成 `.env`：随机凭证、默认端口（Gateway 18797，Relay 18776）、默认模式 `task`，以及一把新的扩展公钥（私钥不保存）。文件已存在时拒绝执行，也不会打印 token。可调整的项见 `.env.example`。
+
+### 运行 Gateway（本机）
+
+```powershell
+uv run gemini-remote gateway
+```
+
+默认只监听 `127.0.0.1`，端口取 `GEMINI_REMOTE_GATEWAY_PORT`。可以用 `--host` / `--port` 覆盖。
+
+| 路径 | 用途 | 鉴权 |
+| --- | --- | --- |
+| `/mcp/` | MCP（Streamable HTTP）：`gemini_send` / `gemini_status` / `gemini_result` | `Authorization: Bearer <GEMINI_REMOTE_CONTROL_TOKEN>` |
+| `/ws/device` | Relay 连入，消息全部 HMAC 签名 | device token + device id |
+| `/health` | 版本号，以及 Relay 是否在线 | 无 |
+
+任务数据存放在 `GEMINI_REMOTE_DATA_DIR/gateway.sqlite3`。
 
 ### 构建与加载扩展
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gemini Remote Browser Bridge",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "minimum_chrome_version": "116",
   "description": "Lets the local Gemini-Remote Relay drive your logged-in Gemini tab. Pairs with the Relay by a one-time code; never reads Google credentials or cookies.",
   "permissions": [

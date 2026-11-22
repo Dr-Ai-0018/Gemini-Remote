@@ -3,4 +3,4 @@
 The Google login state never leaves the browser; no component here reads it.
 """
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"

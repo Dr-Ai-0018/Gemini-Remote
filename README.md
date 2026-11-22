@@ -12,7 +12,7 @@ MCP 客户端调用 `gemini_send` 提交任务，立即拿到 job_id。任务经
 - 每个任务只发送一次；无法确认是否已发出时标记为不确定，不自动重发。
 - 页面相关的选择器集中在一个 adapter 里，Gemini 改版只改这一处。
 
-当前状态：**开发中。** Gateway 和 Relay 已可在本机运行：三个 MCP 工具可用，任务存进 SQLite 排队；Relay 通过签名 WebSocket 领取任务、先落盘再确认，再交给本机扩展，扩展回报的结果经 outbox 送回 Gateway。扩展端还没有接上 Relay，也还不会操作页面，所以任务暂时会停在等待浏览器的状态。
+当前状态：**开发中。** Gateway 和 Relay 已可在本机运行：三个 MCP 工具可用，任务存进 SQLite 排队；Relay 通过签名 WebSocket 领取任务、先落盘再确认，再交给本机扩展，扩展回报的结果经 outbox 送回 Gateway。扩展是通用构建，装好后在 Gemini 页面的悬浮面板里用配对码连上 Relay；它还不会操作页面（下一阶段），所以任务暂时会停在等待浏览器的状态。
 
 ## 免责声明 / Disclaimer
 
@@ -50,13 +50,13 @@ pnpm test
 
 ### 本地配置
 
-所有与具体安装相关的设置都放在仓库根目录的 ignored `.env` 里，代码和 git 里不写死：总线凭证、端口、默认发送模式、扩展签名公钥（决定扩展 ID）。进程环境变量优先于 `.env`。
+所有与具体安装相关的设置都放在仓库根目录的 ignored `.env` 里，代码和 git 里不写死：总线凭证、端口、默认发送模式。进程环境变量优先于 `.env`。浏览器扩展不读 `.env`，它和 Relay 的信任关系靠配对建立（见下文）。
 
 ```powershell
 uv run gemini-remote init-local
 ```
 
-这条命令生成 `.env`：随机凭证、默认端口（Gateway 18797，Relay 18776）、默认模式 `task`，以及一把新的扩展公钥（私钥不保存）。文件已存在时拒绝执行，也不会打印 token。可调整的项见 `.env.example`。
+这条命令生成 `.env`：随机凭证、默认端口（Gateway 18797，Relay 18776）、默认模式 `task`。文件已存在时拒绝执行，也不会打印 token。可调整的项见 `.env.example`。0.1.4 之前生成的 `.env` 里如果还有 `GEMINI_REMOTE_BROWSER_TOKEN`、`GEMINI_REMOTE_EXTENSION_KEY`，它们已不再使用，可以删掉（`doctor` 会提示）。
 
 ### 运行 Gateway（本机）
 
@@ -80,7 +80,16 @@ uv run gemini-remote gateway
 uv run gemini-remote relay
 ```
 
-Relay 主动连到 `GEMINI_REMOTE_GATEWAY_URL`，自己只在 `127.0.0.1:<GEMINI_REMOTE_RELAY_PORT>` 上监听，供扩展连入。扩展连接要同时满足三点：Origin 是本机扩展的 ID；第一条消息带 browser token；同一时间只有一个连接。
+Relay 主动连到 `GEMINI_REMOTE_GATEWAY_URL`，自己只在 `127.0.0.1:<GEMINI_REMOTE_RELAY_PORT>` 上监听，供扩展连入。
+
+还没有配对过扩展时，Relay 启动后会在终端显示一个 6 位配对码（5 分钟有效，只能用一次）。在 Gemini 页面右下角点 **GR** 按钮，把配对码填进面板即可。之后扩展用配对时拿到的 token 自动连入。
+
+```powershell
+uv run gemini-remote pair          # 生成新的配对码（过期了、或换浏览器时）
+uv run gemini-remote pair --reset  # 解除配对
+```
+
+扩展连接的校验：握手时 Origin 必须是 `chrome-extension://`，普通网页一律拒绝；之后必须是已配对的那个扩展、带着它的 token。Relay 只保存 token 和配对码的哈希；配对码连续输错 5 次即作废。同一时间只接受一个扩展连接。
 
 收到的任务先写进 `GEMINI_REMOTE_DATA_DIR/relay.sqlite3` 再确认，每个任务最多交给浏览器一次。扩展回报的事件先进 outbox，等 Gateway 确认后才算送达；断线重连后会补发，两端都按 ID 去重。
 
@@ -90,7 +99,7 @@ Relay 主动连到 `GEMINI_REMOTE_GATEWAY_URL`，自己只在 `127.0.0.1:<GEMINI
 uv run gemini-remote doctor
 ```
 
-只读检查：`.env` 里各角色的配置是否齐全，端口和扩展 ID，以及正在运行的 Relay 的状态——是否连上 Gateway、扩展是否在线，扩展和 Relay 的版本是否与当前代码一致。它不发起任何网络连接，也不打印凭证。一切正常时退出码为 0。
+只读检查：`.env` 里各角色的配置是否齐全，端口，是否已配对扩展，以及正在运行的 Relay 的状态——是否连上 Gateway、扩展是否在线，扩展和 Relay 的版本是否与当前代码一致。它不发起任何网络连接，也不打印凭证。一切正常时退出码为 0。
 
 ### 构建与加载扩展
 
@@ -98,9 +107,15 @@ uv run gemini-remote doctor
 pnpm build:extension
 ```
 
-构建时从 `.env` 读取扩展公钥和 Relay 端口，写进 `extensions/chromium/dist/manifest.json`，并在 `dist/extension-origin.txt` 输出本机扩展的 origin。仓库里的 `manifest.json` 只是模板。
+构建产物在 `extensions/chromium/dist/`，是通用的：不读 `.env`，不含任何按安装定制的 key、端口或 token，谁构建出来都一样。构建时会核对 manifest、`pyproject.toml` 和 Python 包的版本号是否一致。
 
-在 Edge 的 `edge://extensions` 打开开发者模式，选择「加载解压缩的扩展」并指向 `extensions/chromium/dist/`。打开 `https://gemini.google.com/app` 后，页面 console 里应出现 `[gemini-remote] <版本> preflight ok`。当前扩展只做只读检查，不输入、不点击。
+在 Edge 的 `edge://extensions`（或 Chrome 的 `chrome://extensions`）打开开发者模式，选择「加载解压缩的扩展」并指向 `extensions/chromium/dist/`。然后：
+
+1. 运行 `uv run gemini-remote relay`，记下终端里的配对码。
+2. 打开 `https://gemini.google.com/app`，右下角出现 **GR** 按钮；第一次会自动展开面板。
+3. 输入配对码，面板显示「已连接 Relay」即可。Relay 端口不是 18776 时，先在面板里改端口。工具栏上的扩展图标打开的是同一个面板。
+
+面板和按钮放在 closed shadow DOM 里，不影响 Gemini 页面本身。当前扩展只做只读的页面结构检查，不输入、不点击。
 
 ## License
 

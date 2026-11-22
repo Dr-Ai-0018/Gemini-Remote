@@ -2,21 +2,16 @@ from pathlib import Path
 
 import pytest
 
-from gemini_remote.config.settings import Settings, extension_id_from_key
+from gemini_remote.config.settings import Settings
 from gemini_remote.contracts.models import SendMode
 
 GOOD = "x" * 40
-# Throwaway key; the same vector is checked by the extension build test.
-TEST_KEY = "Z2VtaW5pLXJlbW90ZS10ZXN0LWtleQ=="
-TEST_ID = "adjpkjhmnhmgipgnbfjejnfkbhknkbke"
 
 
 def relay_env(**overrides):
     env = {
         "GEMINI_REMOTE_DEVICE_TOKEN": GOOD,
         "GEMINI_REMOTE_SIGNING_KEY": GOOD,
-        "GEMINI_REMOTE_BROWSER_TOKEN": GOOD,
-        "GEMINI_REMOTE_EXTENSION_KEY": TEST_KEY,
     }
     env.update(overrides)
     return env
@@ -29,24 +24,20 @@ def test_relay_loads_without_control_token(tmp_path):
     assert settings.relay_port == 18776
     assert settings.data_dir == Path(".data")
     assert settings.default_mode is SendMode.TASK
-    assert settings.extension_origin == f"chrome-extension://{TEST_ID}"
 
 
-def test_extension_id_matches_chromium_derivation():
-    assert extension_id_from_key(TEST_KEY) == TEST_ID
-
-
-def test_relay_requires_extension_key(tmp_path):
-    env = relay_env()
-    del env["GEMINI_REMOTE_EXTENSION_KEY"]
-    with pytest.raises(ValueError, match="EXTENSION_KEY"):
-        Settings.from_env("relay", environ=env, env_file=tmp_path / ".env")
+def test_settings_from_older_versions_are_ignored(tmp_path):
+    # The extension now pairs at runtime; old .env lines must not break the Relay.
+    settings = Settings.from_env("relay", environ=relay_env(GEMINI_REMOTE_BROWSER_TOKEN="old",
+                                                            GEMINI_REMOTE_EXTENSION_KEY="old"),
+                                 env_file=tmp_path / ".env")
+    assert not hasattr(settings, "browser_token") and not hasattr(settings, "extension_key")
 
 
 @pytest.mark.parametrize(
     ("name", "value"),
     [("GEMINI_REMOTE_RELAY_PORT", "70000"), ("GEMINI_REMOTE_RELAY_PORT", "abc"),
-     ("GEMINI_REMOTE_DEFAULT_MODE", "deep"), ("GEMINI_REMOTE_EXTENSION_KEY", "not base64!")],
+     ("GEMINI_REMOTE_DEFAULT_MODE", "deep")],
 )
 def test_invalid_local_settings_are_rejected(tmp_path, name, value):
     with pytest.raises(ValueError, match=name):
@@ -67,8 +58,8 @@ def test_local_preferences_override_defaults(tmp_path):
 
 @pytest.mark.parametrize("value", ["", "short", "replace-" + "x" * 40])
 def test_missing_short_or_placeholder_secret_is_rejected(tmp_path, value):
-    with pytest.raises(ValueError, match="GEMINI_REMOTE_BROWSER_TOKEN"):
-        Settings.from_env("relay", environ=relay_env(GEMINI_REMOTE_BROWSER_TOKEN=value),
+    with pytest.raises(ValueError, match="GEMINI_REMOTE_DEVICE_TOKEN"):
+        Settings.from_env("relay", environ=relay_env(GEMINI_REMOTE_DEVICE_TOKEN=value),
                           env_file=tmp_path / ".env")
 
 

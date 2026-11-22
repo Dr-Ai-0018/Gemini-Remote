@@ -1,15 +1,12 @@
 import argparse
 import asyncio
-import base64
 import logging
 import os
 import secrets
 import sys
+import time
 from contextlib import suppress
 from pathlib import Path
-
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 
 from gemini_remote import __version__
 from gemini_remote.config.settings import (
@@ -19,15 +16,6 @@ from gemini_remote.config.settings import (
     SECRET_KEYS,
     Settings,
 )
-
-
-def new_extension_public_key() -> str:
-    """Fresh RSA key for a stable extension ID; only the public half is kept."""
-    private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    der = private.public_key().public_bytes(
-        serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-    return base64.b64encode(der).decode("ascii")
 
 
 def init_local(path: Path) -> None:
@@ -42,7 +30,6 @@ def init_local(path: Path) -> None:
         f"{PREFIX}RELAY_PORT={DEFAULT_RELAY_PORT}",
         f"{PREFIX}DATA_DIR={defaults.data_dir.as_posix()}",
         f"{PREFIX}DEFAULT_MODE={defaults.default_mode}",
-        f"{PREFIX}EXTENSION_KEY={new_extension_public_key()}",
     ]
     with path.open("x", encoding="utf-8", newline="\n") as out:
         out.write("\n".join(lines) + "\n")
@@ -62,6 +49,8 @@ def main(argv: list[str] | None = None) -> None:
     gateway.add_argument("--host", default="127.0.0.1", help="bind address (default: loopback only)")
     gateway.add_argument("--port", type=int, help="bind port (default: GEMINI_REMOTE_GATEWAY_PORT)")
     sub.add_parser("relay", help="Run the Relay on this PC (extension socket on 127.0.0.1, dials the Gateway)")
+    pair = sub.add_parser("pair", help="Show a new one-time code for pairing the browser extension with this Relay")
+    pair.add_argument("--reset", action="store_true", help="forget the paired extension instead")
     sub.add_parser("doctor", help="Read-only check of local settings and the running Relay")
     args = parser.parse_args(argv)
 
@@ -92,6 +81,34 @@ def main(argv: list[str] | None = None) -> None:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
         with suppress(KeyboardInterrupt):
             asyncio.run(run_relay(settings))
+    elif args.command == "pair":
+        from gemini_remote.relay.service import JOURNAL_FILE, announce_code
+        from gemini_remote.relay.state import read_status
+        from gemini_remote.storage.pairing import PairingStore
+
+        try:
+            settings = Settings.from_env("relay")
+        except ValueError as exc:
+            parser.error(str(exc))
+        store = PairingStore(settings.data_dir / JOURNAL_FILE)
+        try:
+            if args.reset:
+                store.reset()
+                print("Unpaired. The extension is disconnected within about 30 seconds;"
+                      " run `gemini-remote pair` to pair again.")
+            else:
+                status = read_status(settings.data_dir)
+                running = status is not None and time.time() - float(status.get("updated_at", 0)) <= 20
+                if not running and not store.status()["paired"]:
+                    # The Relay makes and shows a fresh code itself when it starts unpaired.
+                    print("The Relay is not running. Start it with `gemini-remote relay`;"
+                          " it shows a pairing code when it starts.")
+                else:
+                    announce_code(store.new_code(), settings.relay_port)
+                    if not running:
+                        print("The Relay is not running; start it with `gemini-remote relay` before entering the code.")
+        finally:
+            store.close()
     elif args.command == "doctor":
         from gemini_remote.cli.doctor import doctor
 

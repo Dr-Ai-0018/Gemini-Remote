@@ -10,10 +10,14 @@ from urllib.parse import urlsplit
 import time
 
 from gemini_remote import __version__
-from gemini_remote.config.settings import Settings
+from gemini_remote.config.settings import PREFIX, Settings, read_env_file
+from gemini_remote.relay.service import JOURNAL_FILE
 from gemini_remote.relay.state import read_status
+from gemini_remote.storage.pairing import read_pairing
 
 STALE_AFTER_SECONDS = 20.0
+# Settings earlier versions wrote; harmless now that the extension pairs at runtime.
+OBSOLETE_KEYS = (PREFIX + "BROWSER_TOKEN", PREFIX + "EXTENSION_KEY")
 
 
 def _where(url: str) -> str:
@@ -47,7 +51,17 @@ def doctor(env_file: Path = Path(".env"), environ: Mapping[str, str] | None = No
 
     out(f"ports: gateway {relay.gateway_port}, relay {relay.relay_port} (loopback)")
     out(f"gateway: {_where(relay.gateway_url)} as device {relay.device_id!r}")
-    out(f"extension id: {relay.extension_origin.removeprefix('chrome-extension://')}")
+    leftovers = [key for key in OBSOLETE_KEYS if key in read_env_file(env_file)]
+    if leftovers:
+        out(f"  note: {', '.join(leftovers)} in .env are no longer used and can be deleted")
+
+    pairing = read_pairing(relay.data_dir / JOURNAL_FILE)
+    if pairing and pairing["paired"]:
+        out(f"pairing: paired with extension {pairing['origin'].removeprefix('chrome-extension://')}")
+    else:
+        out("pairing: no extension paired (run `gemini-remote pair` and enter the code"
+            " in the Gemini Remote panel on a Gemini tab)")
+        problems += 1
 
     status = read_status(relay.data_dir)
     if status is None:
@@ -72,7 +86,8 @@ def doctor(env_file: Path = Path(".env"), environ: Mapping[str, str] | None = No
 
     extension_version = status.get("extension_version")
     if status.get("browser_connected"):
-        ready = "ready" if status.get("browser_ready") else "not ready (open a Gemini tab)"
+        ready = "ready" if status.get("browser_ready") else ("not ready (open a Gemini tab; this version does not run tasks yet,"
+                                                     " so it always reports not ready)")
         out(f"extension: connected, {ready}, version {extension_version}")
         if extension_version != __version__:
             out(f"  problem: the extension is {extension_version} but this checkout is {__version__};"

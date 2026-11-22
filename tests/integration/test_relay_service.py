@@ -11,9 +11,8 @@ from gemini_remote.config.settings import Settings
 from gemini_remote.relay.service import run_relay
 from gemini_remote.relay.state import read_status
 from gemini_remote.storage.jobs import JobStore
+from gemini_remote.storage.pairing import PairingStore
 
-BROWSER = "b" * 40
-TEST_KEY = "Z2VtaW5pLXJlbW90ZS10ZXN0LWtleQ=="
 ORIGIN = "chrome-extension://adjpkjhmnhmgipgnbfjejnfkbhknkbke"
 
 
@@ -29,16 +28,26 @@ async def test_job_travels_from_gateway_to_extension_and_back(tmp_path):
                                device_id="pc-1", data_dir=tmp_path / "gw"), store)
     await gateway.start()
     relay_dir = tmp_path / "relay"
-    settings = Settings(device_token=DEVICE, signing_key=SIGNING, browser_token=BROWSER, device_id="pc-1",
+    settings = Settings(device_token=DEVICE, signing_key=SIGNING, device_id="pc-1",
                         gateway_url=f"ws://127.0.0.1:{gateway.port}/ws/device", relay_port=free_port(),
-                        data_dir=relay_dir, extension_key=TEST_KEY)
+                        data_dir=relay_dir)
+    pairing = PairingStore(relay_dir / "relay.sqlite3")
+    stale = pairing.new_code()  # left over from before: the Relay replaces it on start
     relay = asyncio.create_task(run_relay(settings, status_interval=0.05))
     try:
         await until(lambda: (read_status(relay_dir) or {}).get("gateway_connected"))
+        code = pairing.new_code()  # what `gemini-remote pair` shows while the Relay runs
+        pairing.close()
+        if stale != code:
+            async with connect(f"ws://127.0.0.1:{settings.relay_port}", origin=ORIGIN) as ext:
+                await ext.send(json.dumps({"type": "pair", "code": stale}))
+                await ext.wait_closed()
+                assert ext.close_reason == "bad_code"
         job = store.submit("write a plan", "k1", "task", 600)["job_id"]
 
         async with connect(f"ws://127.0.0.1:{settings.relay_port}", origin=ORIGIN) as ext:
-            await ext.send(json.dumps({"type": "hello", "token": BROWSER, "extension_version": "0.1.3"}))
+            await ext.send(json.dumps({"type": "pair", "code": code, "extension_version": "0.1.3"}))
+            assert json.loads(await ext.recv())["type"] == "paired"
             assert json.loads(await ext.recv())["type"] == "welcome"
             await ext.send(json.dumps({"type": "status", "browser_ready": True}))
             command = json.loads(await asyncio.wait_for(ext.recv(), 5))

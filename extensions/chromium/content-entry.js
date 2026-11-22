@@ -12,7 +12,7 @@
   function check() {
     const result = globalThis.GeminiSelectors.preflight(document);
     if (result.ok) {
-      console.info(TAG, version, 'preflight ok');
+      console.info(TAG, version, 'preflight ok', result.page);
       return;
     }
     // The page can be connected but not rendered yet; re-check before failing.
@@ -20,7 +20,7 @@
       setTimeout(check, POLL_MS);
       return;
     }
-    console.warn(TAG, version, 'preflight failed', result.problems);
+    console.warn(TAG, version, 'preflight failed', result.page, result.problems);
   }
 
   check();

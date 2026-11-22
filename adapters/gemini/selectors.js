@@ -6,7 +6,8 @@
   'use strict';
 
   const SELECTORS = Object.freeze({
-    // Page-level, present on an idle /app page.
+    // Page-level. The input is always there; the mode switch and model picker
+    // only on a new-chat page.
     input: 'rich-textarea .ql-editor',
     modeButton: 'gem-segmented-button',
     modeButtonSelected: 'gem-segmented-button.gem-segmented-button-selected',
@@ -28,26 +29,39 @@
     responseFooter: '.response-footer',
   });
 
-  // What an idle, logged-in /app page must show before the adapter may act.
-  const PREFLIGHT = Object.freeze([
-    Object.freeze({ name: 'input', expected: 1 }),
-    Object.freeze({ name: 'modeButton', expected: 2 }),
-    Object.freeze({ name: 'modelMenu', expected: 1 }),
-  ]);
+  // What a logged-in page must show before the adapter may act. The Chat/Task
+  // switch and the model picker exist only on a new-chat page (/app); inside an
+  // existing conversation (/app/<id>) both are gone, so only the input is
+  // required there.
+  const PREFLIGHT = Object.freeze({
+    new_chat: Object.freeze([
+      Object.freeze({ name: 'input', expected: 1 }),
+      Object.freeze({ name: 'modeButton', expected: 2 }),
+      Object.freeze({ name: 'modelMenu', expected: 1 }),
+    ]),
+    conversation: Object.freeze([
+      Object.freeze({ name: 'input', expected: 1 }),
+    ]),
+  });
+
+  function pageKind(pathname) {
+    return /^\/app\/?$/.test(pathname || '') ? 'new_chat' : 'conversation';
+  }
 
   // Read-only: counts matches, never clicks or types. Missing or ambiguous
   // structure is reported instead of guessed around.
-  function preflight(doc) {
+  function preflight(doc, pathname = doc.location && doc.location.pathname) {
+    const page = pageKind(pathname);
     const problems = [];
-    for (const check of PREFLIGHT) {
+    for (const check of PREFLIGHT[page]) {
       const selector = SELECTORS[check.name];
       const found = doc.querySelectorAll(selector).length;
       if (found !== check.expected) {
         problems.push({ name: check.name, selector, expected: check.expected, found });
       }
     }
-    return { ok: problems.length === 0, problems };
+    return { ok: problems.length === 0, page, problems };
   }
 
-  root.GeminiSelectors = Object.freeze({ SELECTORS, PREFLIGHT, preflight });
+  root.GeminiSelectors = Object.freeze({ SELECTORS, PREFLIGHT, pageKind, preflight });
 })(globalThis);

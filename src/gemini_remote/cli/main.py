@@ -1,20 +1,43 @@
 import argparse
+import base64
 import os
 import secrets
 from pathlib import Path
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+
 from gemini_remote import __version__
-from gemini_remote.config.settings import DEFAULT_GATEWAY_PORT, PREFIX, SECRET_KEYS
+from gemini_remote.config.settings import (
+    DEFAULT_GATEWAY_PORT,
+    DEFAULT_RELAY_PORT,
+    PREFIX,
+    SECRET_KEYS,
+    Settings,
+)
+
+
+def new_extension_public_key() -> str:
+    """Fresh RSA key for a stable extension ID; only the public half is kept."""
+    private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    der = private.public_key().public_bytes(
+        serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    return base64.b64encode(der).decode("ascii")
 
 
 def init_local(path: Path) -> None:
-    """Create a local .env with fresh bus credentials. Never overwrites, never prints them."""
-    lines = ["# Gemini-Remote bus credentials only. Never put Google login state here."]
+    """Create a local .env with fresh credentials and settings. Never overwrites, never prints tokens."""
+    defaults = Settings()
+    lines = ["# Gemini-Remote local settings. Never put Google login state here."]
     lines += [f"{PREFIX}{key.upper()}={secrets.token_urlsafe(48)}" for key in SECRET_KEYS]
     lines += [
-        f"{PREFIX}DEVICE_ID=owner-pc",
+        f"{PREFIX}DEVICE_ID={defaults.device_id}",
         f"{PREFIX}GATEWAY_URL=ws://127.0.0.1:{DEFAULT_GATEWAY_PORT}/ws/device",
-        f"{PREFIX}DATA_DIR=.data",
+        f"{PREFIX}RELAY_PORT={DEFAULT_RELAY_PORT}",
+        f"{PREFIX}DATA_DIR={defaults.data_dir.as_posix()}",
+        f"{PREFIX}DEFAULT_MODE={defaults.default_mode}",
+        f"{PREFIX}EXTENSION_KEY={new_extension_public_key()}",
     ]
     with path.open("x", encoding="utf-8", newline="\n") as out:
         out.write("\n".join(lines) + "\n")
@@ -29,7 +52,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("init-local", help="Create an ignored local .env with bus credentials (no overwrite, no printing)")
+    sub.add_parser("init-local", help="Create an ignored local .env with credentials and settings (no overwrite, no printing)")
     args = parser.parse_args(argv)
 
     if args.command == "init-local":
@@ -37,4 +60,4 @@ def main(argv: list[str] | None = None) -> None:
         if path.exists():
             parser.error(".env already exists; refusing to overwrite or rotate credentials")
         init_local(path)
-        print("Created .env with local bus credentials. Tokens were not displayed.")
+        print("Created .env with local credentials and settings. Tokens were not displayed.")

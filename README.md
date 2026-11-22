@@ -36,15 +36,28 @@ uv sync --group dev
 uv run gemini-remote --version
 uv run pytest -q
 pnpm install
-pnpm build:extension
 pnpm test
 ```
 
-`uv run gemini-remote init-local` 在当前目录生成 ignored `.env`，包含新的本机总线凭证；文件已存在时拒绝执行，也不会打印 token。配置项见 `.env.example`。
+### 本地配置
 
-默认端口：Gateway 18797，Relay 18776。
+所有与具体安装相关的设置都放在仓库根目录的 ignored `.env` 里，代码和 git 里不写死：总线凭证、端口、默认发送模式、扩展签名公钥（决定扩展 ID）。进程环境变量优先于 `.env`。
 
-加载扩展：在 Edge 的 `edge://extensions` 打开开发者模式，选择「加载解压缩的扩展」并指向 `extensions/chromium/dist/`。打开 `https://gemini.google.com/app` 后，页面 console 里应出现 `[gemini-remote] <版本> preflight ok`。当前扩展只做只读检查，不输入、不点击。
+```powershell
+uv run gemini-remote init-local
+```
+
+这条命令生成 `.env`：随机凭证、默认端口（Gateway 18797，Relay 18776）、默认模式 `task`，以及一把新的扩展公钥（私钥不保存）。文件已存在时拒绝执行，也不会打印 token。可调整的项见 `.env.example`。
+
+### 构建与加载扩展
+
+```powershell
+pnpm build:extension
+```
+
+构建时从 `.env` 读取扩展公钥和 Relay 端口，写进 `extensions/chromium/dist/manifest.json`，并在 `dist/extension-origin.txt` 输出本机扩展的 origin。仓库里的 `manifest.json` 只是模板。
+
+在 Edge 的 `edge://extensions` 打开开发者模式，选择「加载解压缩的扩展」并指向 `extensions/chromium/dist/`。打开 `https://gemini.google.com/app` 后，页面 console 里应出现 `[gemini-remote] <版本> preflight ok`。当前扩展只做只读检查，不输入、不点击。
 
 ## License
 

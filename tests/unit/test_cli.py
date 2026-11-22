@@ -20,10 +20,23 @@ def test_init_local_creates_usable_env_without_printing_tokens(tmp_path, monkeyp
     output = capsys.readouterr()
     for role in ("gateway", "relay", "client"):
         Settings.from_env(role, environ={}, env_file=env_file)
+    relay = Settings.from_env("relay", environ={}, env_file=env_file)
+    assert relay.extension_origin.startswith("chrome-extension://")
+    assert "PRIVATE" not in content
     for line in content.splitlines():
         if "_TOKEN=" in line or "_KEY=" in line:
             secret = line.split("=", 1)[1]
             assert secret not in output.out + output.err
+
+
+def test_each_init_local_gets_its_own_extension_identity(tmp_path, monkeypatch):
+    origins = set()
+    for name in ("a", "b"):
+        (tmp_path / name).mkdir()
+        monkeypatch.chdir(tmp_path / name)
+        main(["init-local"])
+        origins.add(Settings.from_env("relay", environ={}, env_file=tmp_path / name / ".env").extension_origin)
+    assert len(origins) == 2
 
 
 def test_init_local_refuses_to_overwrite(tmp_path, monkeypatch):

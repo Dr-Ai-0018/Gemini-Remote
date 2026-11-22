@@ -12,7 +12,7 @@ MCP 客户端调用 `gemini_send` 提交任务，立即拿到 job_id。任务经
 - 每个任务只发送一次；无法确认是否已发出时标记为不确定，不自动重发。
 - 页面相关的选择器集中在一个 adapter 里，Gemini 改版只改这一处。
 
-当前状态：**开发中。** Gateway 已可在本机运行：三个 MCP 工具可用，任务存进 SQLite 排队，Relay 通过签名 WebSocket 领取任务、回报结果。Relay 和浏览器端的发送链路还没有实现，所以任务暂时只会停在排队状态。
+当前状态：**开发中。** Gateway 和 Relay 已可在本机运行：三个 MCP 工具可用，任务存进 SQLite 排队；Relay 通过签名 WebSocket 领取任务、先落盘再确认，再交给本机扩展，扩展回报的结果经 outbox 送回 Gateway。扩展端还没有接上 Relay，也还不会操作页面，所以任务暂时会停在等待浏览器的状态。
 
 ## 免责声明 / Disclaimer
 
@@ -33,11 +33,11 @@ This is an unofficial project for learning and research only, and is not affilia
 
 | 路径 | 职责 |
 | --- | --- |
-| `src/gemini_remote/` | Python 包：CLI、配置、Job 合同与签名信封、SQLite 任务存储、Gateway |
+| `src/gemini_remote/` | Python 包：CLI、配置、Job 合同与签名信封、SQLite 存储、Gateway、Relay |
 | `adapters/gemini/` | 与 Gemini 页面结构相关的选择器和 adapter，改版只改这里 |
 | `extensions/chromium/` | 扩展源文件与 manifest；构建产物在 ignored `dist/` |
 | `tools/` | 构建脚本 |
-| `tests/unit/`、`tests/browser/` | Python 单测；基于 jsdom 合成页面的浏览器侧测试，不碰真实 Gemini |
+| `tests/unit/`、`tests/integration/`、`tests/browser/` | Python 单测；只在回环地址上跑的 Gateway / Relay 集成测试；基于 jsdom 合成页面的浏览器侧测试，不碰真实 Gemini |
 
 ```powershell
 uv python install 3.13
@@ -73,6 +73,24 @@ uv run gemini-remote gateway
 | `/health` | 版本号，以及 Relay 是否在线 | 无 |
 
 任务数据存放在 `GEMINI_REMOTE_DATA_DIR/gateway.sqlite3`。
+
+### 运行 Relay（本机）
+
+```powershell
+uv run gemini-remote relay
+```
+
+Relay 主动连到 `GEMINI_REMOTE_GATEWAY_URL`，自己只在 `127.0.0.1:<GEMINI_REMOTE_RELAY_PORT>` 上监听，供扩展连入。扩展连接要同时满足三点：Origin 是本机扩展的 ID；第一条消息带 browser token；同一时间只有一个连接。
+
+收到的任务先写进 `GEMINI_REMOTE_DATA_DIR/relay.sqlite3` 再确认，每个任务最多交给浏览器一次。扩展回报的事件先进 outbox，等 Gateway 确认后才算送达；断线重连后会补发，两端都按 ID 去重。
+
+### 诊断
+
+```powershell
+uv run gemini-remote doctor
+```
+
+只读检查：`.env` 里各角色的配置是否齐全，端口和扩展 ID，以及正在运行的 Relay 的状态——是否连上 Gateway、扩展是否在线，扩展和 Relay 的版本是否与当前代码一致。它不发起任何网络连接，也不打印凭证。一切正常时退出码为 0。
 
 ### 构建与加载扩展
 

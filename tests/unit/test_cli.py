@@ -49,6 +49,29 @@ def test_gateway_refuses_to_start_without_credentials(tmp_path, monkeypatch, cap
     assert "CONTROL_TOKEN" in capsys.readouterr().err
 
 
+def test_relay_refuses_to_start_without_credentials(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    for key in [k for k in __import__("os").environ if k.startswith("GEMINI_REMOTE_")]:
+        monkeypatch.delenv(key)
+    with pytest.raises(SystemExit) as exc:
+        main(["relay"])
+    assert exc.value.code == 2
+    assert "GEMINI_REMOTE_" in capsys.readouterr().err
+
+
+def test_doctor_on_a_fresh_install_reports_the_relay_is_not_running(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    for key in [k for k in __import__("os").environ if k.startswith("GEMINI_REMOTE_")]:
+        monkeypatch.delenv(key)
+    main(["init-local"])
+    capsys.readouterr()
+    with pytest.raises(SystemExit) as exc:
+        main(["doctor"])
+    out = capsys.readouterr().out
+    assert exc.value.code == 1
+    assert "relay    ok" in out and "relay: not running" in out
+
+
 def test_init_local_refuses_to_overwrite(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".env").write_text("keep me\n", encoding="utf-8")

@@ -1,7 +1,11 @@
 import argparse
+import asyncio
 import base64
+import logging
 import os
 import secrets
+import sys
+from contextlib import suppress
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
@@ -57,6 +61,8 @@ def main(argv: list[str] | None = None) -> None:
     gateway = sub.add_parser("gateway", help="Run the Gateway (MCP at /mcp/, Relay socket at /ws/device)")
     gateway.add_argument("--host", default="127.0.0.1", help="bind address (default: loopback only)")
     gateway.add_argument("--port", type=int, help="bind port (default: GEMINI_REMOTE_GATEWAY_PORT)")
+    sub.add_parser("relay", help="Run the Relay on this PC (extension socket on 127.0.0.1, dials the Gateway)")
+    sub.add_parser("doctor", help="Read-only check of local settings and the running Relay")
     args = parser.parse_args(argv)
 
     if args.command == "init-local":
@@ -75,4 +81,18 @@ def main(argv: list[str] | None = None) -> None:
         except ValueError as exc:
             parser.error(str(exc))
         uvicorn.run(create_app(settings), host=args.host, port=args.port or settings.gateway_port,
-                    log_level="info", access_log=False)
+                    log_level="info", access_log=False, ws="websockets-sansio")
+    elif args.command == "relay":
+        from gemini_remote.relay.service import run_relay
+
+        try:
+            settings = Settings.from_env("relay")
+        except ValueError as exc:
+            parser.error(str(exc))
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+        with suppress(KeyboardInterrupt):
+            asyncio.run(run_relay(settings))
+    elif args.command == "doctor":
+        from gemini_remote.cli.doctor import doctor
+
+        sys.exit(doctor())

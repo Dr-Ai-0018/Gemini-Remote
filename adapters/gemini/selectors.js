@@ -1,6 +1,6 @@
 // Every Gemini page selector lives here. When Google changes the page, only
 // this file (and the adapter that reads it) should need to change.
-// Snapshot: design/gemini-page-probe-2026-11-22.md. aria-label values assume
+// Snapshot of the page structure as of 2026-11-22. aria-label values assume
 // the English UI.
 (function (root) {
   'use strict';

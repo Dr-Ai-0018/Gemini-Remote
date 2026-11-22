@@ -4,7 +4,7 @@
 
 ## 项目简介 / Overview
 
-MCP 客户端调用 `gemini_send` 提交任务，立即拿到 job_id。任务经 Gateway 转到 owner 电脑上的 Relay，再由浏览器扩展在已登录的 `gemini.google.com` 页面里输入并发送。完成后，回复正文和 Canvas 文档作为结果返回，调用方用 `gemini_status` / `gemini_result` 查询。
+MCP 客户端调用 `gemini_send` 提交任务，立即拿到 job_id。任务经 Gateway 转到你自己电脑上的 Relay，再由浏览器扩展在已登录的 `gemini.google.com` 页面里输入并发送。完成后，回复正文和 Canvas 文档作为结果返回，调用方用 `gemini_status` / `gemini_result` 查询。
 
 设计原则：
 
@@ -12,7 +12,7 @@ MCP 客户端调用 `gemini_send` 提交任务，立即拿到 job_id。任务经
 - 每个任务只发送一次；无法确认是否已发出时标记为不确定，不自动重发。
 - 页面相关的选择器集中在一个 adapter 里，Gemini 改版只改这一处。
 
-当前状态：**工程骨架阶段。** 已有 CLI、配置校验、Job 状态定义、集中的页面选择器和只读 preflight 扩展；Gateway、Relay、MCP 工具和发送链路尚未实现。调研结论见 [design/](design/README.md)。
+当前状态：**工程骨架阶段。** 已有 CLI、配置校验、Job 状态定义、集中的页面选择器和只读 preflight 扩展；Gateway、Relay、MCP 工具和发送链路尚未实现。
 
 ## 使用 / Usage
 

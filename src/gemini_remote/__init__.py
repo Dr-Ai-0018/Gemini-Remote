@@ -1,4 +1,4 @@
-"""Gemini-Remote: MCP tasks run in the owner's logged-in Gemini web page.
+"""Gemini-Remote: MCP tasks run in a logged-in Gemini web page in your own browser.
 
 The Google login state never leaves the browser; no component here reads it.
 """

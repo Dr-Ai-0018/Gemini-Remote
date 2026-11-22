@@ -3,13 +3,17 @@
   "name": "Gemini Remote Browser Bridge",
   "version": "0.1.3",
   "minimum_chrome_version": "116",
-  "description": "Local Gemini page adapter. Never reads Google credentials or cookies.",
+  "description": "Lets the local Gemini-Remote Relay drive your logged-in Gemini tab. Pairs with the Relay by a one-time code; never reads Google credentials or cookies.",
   "permissions": [
     "storage"
   ],
   "host_permissions": [
     "http://127.0.0.1/*"
   ],
+  "action": {
+    "default_title": "Gemini Remote",
+    "default_popup": "popup.html"
+  },
   "background": {
     "service_worker": "background.js"
   },
@@ -22,6 +26,7 @@
       "run_at": "document_idle",
       "js": [
         "selectors.js",
+        "panel.js",
         "content-entry.js"
       ]
     }

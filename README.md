@@ -14,6 +14,15 @@ MCP 客户端调用 `gemini_send` 提交任务，立即拿到 job_id。任务经
 
 当前状态：**开发中。** Gateway 已可在本机运行：三个 MCP 工具可用，任务存进 SQLite 排队，Relay 通过签名 WebSocket 领取任务、回报结果。Relay 和浏览器端的发送链路还没有实现，所以任务暂时只会停在排队状态。
 
+## 免责声明 / Disclaimer
+
+- 本项目仅供学习和技术交流使用，是非官方项目，与 Google 没有任何关联，也未获得其认可。
+- 它通过浏览器扩展操作你自己已登录的 Gemini 网页。使用前请自行确认你的用法符合 Google 服务条款、Gemini 相关使用政策，以及你所在地的法律法规。
+- 使用本项目产生的一切后果，包括但不限于账号受限或被封禁、数据丢失、违反平台规则，均由使用者自行承担，作者和贡献者不承担任何责任。
+- 本软件按 MIT 许可证「按原样」提供，不附带任何形式的担保。
+
+This is an unofficial project for learning and research only, and is not affiliated with or endorsed by Google. It automates your own logged-in Gemini web session; you are responsible for making sure your use complies with Google's terms, Gemini's usage policies and applicable laws. You use it entirely at your own risk; the authors and contributors accept no liability for any consequence, including account restrictions or bans. The software is provided "as is" under the MIT License, without warranty of any kind.
+
 ## 使用 / Usage
 
 尚未实现。
